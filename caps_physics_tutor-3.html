@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CAPS Physics Tutor | Grade 10-12</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --accent: #38bdf8;
+    --accent2: #22c55e;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --danger: #ef4444;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; font-family: system-ui, -apple-system, sans-serif;
+    background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column;
+  }
+  header {
+    background: var(--panel); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between;
+    border-bottom: 1px solid #334155;
+  }
+  header h1 { margin: 0; font-size: 1.3rem; }
+  header .sub { color: var(--muted); font-size: 0.85rem; }
+  .controls { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
+  select, button, input[type="text"], input[type="password"] {
+    background: #0f172a; color: var(--text); border: 1px solid #475569; border-radius: 6px;
+    padding: 6px 10px; font-size: 0.9rem;
+  }
+  button { cursor: pointer; background: var(--accent); color: #0f172a; font-weight: 600; border: none; }
+  button:hover { filter: brightness(1.1); }
+  button.secondary { background: #475569; color: white; }
+  button.danger { background: var(--danger); }
+  main { flex: 1; display: flex; overflow: hidden; }
+  .sidebar {
+    width: 280px; background: var(--panel); padding: 16px; overflow-y: auto; border-right: 1px solid #334155;
+  }
+  .sidebar h3 { margin: 0 0 8px 0; font-size: 0.95rem; }
+  .progress-item { margin: 8px 0; }
+  .progress-bar { height: 8px; background: #334155; border-radius: 4px; overflow: hidden; margin-top: 4px; }
+  .progress-fill { height: 100%; background: var(--accent2); transition: width 0.3s; }
+  .chat-area { flex: 1; display: flex; flex-direction: column; }
+  #messages {
+    flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 12px;
+  }
+  .msg { max-width: 75%; padding: 10px 14px; border-radius: 12px; line-height: 1.45; }
+  .msg.user { align-self: flex-end; background: #0369a1; }
+  .msg.assistant { align-self: flex-start; background: #334155; }
+  .msg .meta { font-size: 0.75rem; color: var(--muted); margin-bottom: 4px; }
+  .input-area {
+    padding: 12px 16px; background: var(--panel); border-top: 1px solid #334155; display: flex; gap: 8px; align-items: center;
+  }
+  #userInput { flex: 1; }
+  .dashboard { display: none; padding: 20px; overflow-y: auto; }
+  .dashboard.active { display: block; }
+  .chat-area.hidden { display: none; }
+  .card { background: var(--panel); padding: 16px; border-radius: 8px; margin-bottom: 16px; }
+  .practice-q { background: #0f172a; padding: 12px; border-radius: 8px; margin: 8px 0; border-left: 3px solid var(--accent); }
+  .api-config { font-size: 0.8rem; color: var(--muted); margin-top: 12px; }
+  .voice-btn { background: #7c3aed; }
+  .voice-btn.listening { background: var(--danger); animation: pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity: 0.7; } }
+  footer { text-align: center; font-size: 0.75rem; color: var(--muted); padding: 6px; background: var(--panel); }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>CAPS Physics Tutor</h1>
+    <div class="sub">Grade 10–12 Physical Sciences • South Africa</div>
+  </div>
+  <div class="controls">
+    <select id="gradeSelect">
+      <option value="10">Grade 10</option>
+      <option value="11">Grade 11</option>
+      <option value="12" selected>Grade 12</option>
+    </select>
+    <select id="topicSelect">
+      <option value="mechanics">Mechanics</option>
+      <option value="waves">Waves, Sound & Light</option>
+      <option value="electricity">Electricity & Magnetism</option>
+      <option value="matter">Matter & Materials (Physics)</option>
+      <option value="general">General / Mixed</option>
+    </select>
+    <button id="viewToggle" class="secondary">Dashboard</button>
+    <button id="clearChat" class="danger">Clear Chat</button>
+  </div>
+</header>
+
+<main>
+  <aside class="sidebar">
+    <h3>Progress & Mastery</h3>
+    <div id="progressList"></div>
+    <h3 style="margin-top:20px;">Practice Questions</h3>
+    <button id="loadPractice" style="width:100%; margin-bottom:8px;">Generate Practice</button>
+    <div id="practiceArea"></div>
+    <div class="api-config">
+      <strong>API (optional for real AI)</strong><br>
+      <input type="password" id="apiKey" placeholder="API Key (OpenAI/Anthropic compatible)" style="width:100%; margin:6px 0;">
+      <input type="text" id="apiUrl" placeholder="API URL (default: OpenAI)" value="https://api.openai.com/v1/chat/completions" style="width:100%;">
+      <div style="margin-top:6px; font-size:0.75rem;">Without a key, the tutor runs in demo mode with guided responses.</div>
+    </div>
+  </aside>
+
+  <div class="chat-area" id="chatView">
+    <div id="messages"></div>
+    <div class="input-area">
+      <button id="voiceBtn" class="voice-btn" title="Voice input">🎤</button>
+      <input type="text" id="userInput" placeholder="Ask a question about CAPS physics..." autofocus>
+      <button id="sendBtn">Send</button>
+      <button id="speakBtn" class="secondary" title="Read last response">🔊</button>
+    </div>
+  </div>
+
+  <div class="dashboard" id="dashboardView">
+    <div class="card">
+      <h2>Teacher / Parent Dashboard</h2>
+      <p>This view shows simulated progress for the current student session. In a full deployment this would be multi-user with accounts.</p>
+      <div id="dashContent"></div>
+    </div>
+    <div class="card">
+      <h3>Safety & Curriculum Grounding</h3>
+      <ul>
+        <li>System prompt enforces CAPS alignment and Socratic tutoring.</li>
+        <li>Responses stay on physics curriculum topics.</li>
+        <li>No direct answers on first request — method marks emphasized.</li>
+        <li>In production: add content filters, rate limits, and audit logs.</li>
+      </ul>
+    </div>
+    <div class="card">
+      <h3>Next Steps</h3>
+      <ol>
+        <li>Add your LLM API key above for real responses.</li>
+        <li>Expand practice questions with real NSC past papers.</li>
+        <li>Add RAG over official CAPS documents.</li>
+        <li>Deploy as PWA or wrap in React Native for mobile.</li>
+      </ol>
+    </div>
+  </div>
+</main>
+<footer>CAPS-aligned Physics Tutor Prototype • Local storage only • For educational use</footer>
+
+<script>
+const SYSTEM_PROMPT = `You are an expert Physical Sciences tutor for South African Grade 10, 11 and 12 learners following the CAPS curriculum. Focus on physics (Paper 1). Be patient, Socratic, scaffolded. Never give the final answer immediately — guide with questions and progressive hints. Emphasize method marks, SI units, and NSC exam style. Use South African contexts. Align strictly with CAPS topics for the student's grade.
+
+Grade 10: vectors/scalars, 1D motion, energy, basic waves/sound/light, basic electricity/magnetism.
+Grade 11: 2D vectors, Newton's Laws + gravitation, geometrical optics, Coulomb's law, electric fields, circuits.
+Grade 12: momentum & impulse, vertical projectiles, work-energy-power, Doppler, electrostatics, advanced circuits, electrodynamics, photoelectric effect.
+
+Current student grade and topic will be provided in the conversation. End most responses with a guiding question.`;
+
+const topicsByGrade = {
+  "10": ["Mechanics (1D motion, energy)", "Waves & Sound", "Basic Electricity", "Magnetism"],
+  "11": ["Newton’s Laws", "2D Vectors", "Optics", "Electrostatics", "Circuits"],
+  "12": ["Momentum & Impulse", "Projectile Motion", "Work-Energy-Power", "Doppler Effect", "Electricity & Magnetism", "Photoelectric Effect"]
+};
+
+const practiceBank = {
+  "12-mechanics": [
+    "A ball is thrown vertically upward with an initial speed of 15 m·s⁻¹ from a height of 2 m. Calculate the maximum height reached above the ground. (Take g = 9.8 m·s⁻² downward.)",
+    "State the impulse-momentum theorem and use it to calculate the average force if a 0.5 kg ball changes velocity from 8 m·s⁻¹ to 2 m·s⁻¹ in 0.1 s.",
+    "A 1200 kg car accelerates from rest to 20 m·s⁻¹ in 8 s. Calculate the work done by the net force."
+  ],
+  "12-electricity": [
+    "State Coulomb’s law and calculate the force between two charges of +3 µC and −2 µC separated by 0.4 m in air.",
+    "A circuit has a 12 V battery with internal resistance 0.5 Ω connected to an external 5 Ω resistor. Calculate the current and terminal potential difference.",
+    "Explain the principle of operation of an AC generator and how the induced emf varies."
+  ],
+  "11-mechanics": [
+    "Draw a free-body diagram for a box on a rough horizontal surface being pulled by a force at an angle. Label all forces.",
+    "State Newton’s three laws and give a CAPS-level example of each."
+  ]
+};
+
+let messages = [];
+let progress = JSON.parse(localStorage.getItem("capsProgress") || "{}");
+let recognition = null;
+let isListening = false;
+
+function saveProgress() { localStorage.setItem("capsProgress", JSON.stringify(progress)); }
+
+function updateProgressUI() {
+  const grade = document.getElementById("gradeSelect").value;
+  const list = document.getElementById("progressList");
+  const topics = topicsByGrade[grade] || [];
+  list.innerHTML = topics.map(t => {
+    const key = `${grade}-${t}`;
+    const val = progress[key] || 0;
+    return `<div class="progress-item">${t}<div class="progress-bar"><div class="progress-fill" style="width:${val}%"></div></div><small>${val}% mastery</small></div>`;
+  }).join("");
+}
+
+function addMessage(role, text) {
+  messages.push({ role, text });
+  const div = document.createElement("div");
+  div.className = `msg ${role}`;
+  div.innerHTML = `<div class="meta">${role === "user" ? "You" : "Tutor"}</div>${text.replace(/\n/g, "<br>")}`;
+  document.getElementById("messages").appendChild(div);
+  document.getElementById("messages").scrollTop = document.getElementById("messages").scrollHeight;
+}
+
+async function sendMessage() {
+  const input = document.getElementById("userInput");
+  const text = input.value.trim();
+  if (!text) return;
+  input.value = "";
+  addMessage("user", text);
+
+  const grade = document.getElementById("gradeSelect").value;
+  const topic = document.getElementById("topicSelect").value;
+  const apiKey = document.getElementById("apiKey").value.trim();
+  const apiUrl = document.getElementById("apiUrl").value.trim() || "https://api.openai.com/v1/chat/completions";
+
+  let reply = "";
+  if (apiKey) {
+    try {
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+        body: JSON.stringify({
+          model: "gpt-4o-mini",
+          messages: [
+            { role: "system", content: SYSTEM_PROMPT + `\n\nStudent is in Grade ${grade}, focusing on ${topic}.` },
+            ...messages.slice(-8).map(m => ({ role: m.role === "user" ? "user" : "assistant", content: m.text }))
+          ],
+          temperature: 0.7
+        })
+      });
+      const data = await res.json();
+      reply = data.choices?.[0]?.message?.content || "No response from API.";
+    } catch (e) {
+      reply = "API error. Falling back to demo mode. Check your key and URL.\n\n" + getDemoReply(text, grade, topic);
+    }
+  } else {
+    reply = getDemoReply(text, grade, topic);
+  }
+
+  addMessage("assistant", reply);
+
+  // Simple progress bump
+  const key = `${grade}-${topic}`;
+  progress[key] = Math.min(100, (progress[key] || 0) + 5);
+  saveProgress();
+  updateProgressUI();
+}
+
+function getDemoReply(q, grade, topic) {
+  const lower = q.toLowerCase();
+  if (lower.includes("answer") || lower.includes("solve") || lower.includes("calculate")) {
+    return `Great question for Grade ${grade} ${topic}.\n\nBefore I help with the calculation, tell me:\n1. What formula do you think applies here?\n2. What are the given values and their units?\n3. What is the unknown you're solving for?\n\nWrite your first step and I'll guide you from there. (This is demo mode — add an API key for full AI responses.)`;
+  }
+  if (lower.includes("projectile") || lower.includes("thrown")) {
+    return `Vertical projectile motion (Grade 12 Mechanics) uses the equations of motion with a = −9.8 m·s⁻² (downward).\n\nWhat is the velocity at the maximum height? Once you answer that, we can choose the right equation.`;
+  }
+  if (lower.includes("newton") || lower.includes("force")) {
+    return `Newton’s laws are central to Grade 11 Mechanics.\n\nCan you state Newton’s second law in words and as an equation? Then we’ll apply it to a free-body diagram.`;
+  }
+  return `I'm here to help with Grade ${grade} CAPS ${topic}.\n\nTo give you the best guidance, tell me:\n- What specifically are you stuck on?\n- Have you tried a particular formula or step?\n\n(Demo mode active. Paste an OpenAI-compatible API key in the sidebar for real Socratic tutoring.)`;
+}
+
+function loadPractice() {
+  const grade = document.getElementById("gradeSelect").value;
+  const topic = document.getElementById("topicSelect").value;
+  const key = `${grade}-${topic}`;
+  const qs = practiceBank[key] || practiceBank["12-mechanics"];
+  const area = document.getElementById("practiceArea");
+  area.innerHTML = qs.map((q, i) => `<div class="practice-q"><strong>Q${i+1}:</strong> ${q}<br><button onclick="document.getElementById('userInput').value=this.parentElement.innerText.replace(/Q\\d+: /,'').trim(); document.getElementById('userInput').focus();">Ask Tutor</button></div>`).join("");
+}
+
+// Voice
+if ("webkitSpeechRecognition" in window || "SpeechRecognition" in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.lang = "en-ZA";
+  recognition.onresult = (e) => {
+    document.getElementById("userInput").value = e.results[0][0].transcript;
+    isListening = false;
+    document.getElementById("voiceBtn").classList.remove("listening");
+  };
+  recognition.onend = () => { isListening = false; document.getElementById("voiceBtn").classList.remove("listening"); };
+}
+
+document.getElementById("voiceBtn").onclick = () => {
+  if (!recognition) { alert("Voice input not supported in this browser."); return; }
+  if (isListening) { recognition.stop(); return; }
+  isListening = true;
+  document.getElementById("voiceBtn").classList.add("listening");
+  recognition.start();
+};
+
+document.getElementById("speakBtn").onclick = () => {
+  const last = [...document.querySelectorAll(".msg.assistant")].pop();
+  if (!last) return;
+  const utter = new SpeechSynthesisUtterance(last.innerText);
+  utter.lang = "en-ZA";
+  speechSynthesis.speak(utter);
+};
+
+document.getElementById("sendBtn").onclick = sendMessage;
+document.getElementById("userInput").onkeypress = (e) => { if (e.key === "Enter") sendMessage(); };
+document.getElementById("clearChat").onclick = () => {
+  messages = [];
+  document.getElementById("messages").innerHTML = "";
+  addMessage("assistant", "Chat cleared. What CAPS physics topic would you like to work on?");
+};
+document.getElementById("loadPractice").onclick = loadPractice;
+document.getElementById("gradeSelect").onchange = updateProgressUI;
+document.getElementById("topicSelect").onchange = updateProgressUI;
+
+document.getElementById("viewToggle").onclick = () => {
+  const chat = document.getElementById("chatView");
+  const dash = document.getElementById("dashboardView");
+  const btn = document.getElementById("viewToggle");
+  if (dash.classList.contains("active")) {
+    dash.classList.remove("active");
+    chat.classList.remove("hidden");
+    btn.textContent = "Dashboard";
+  } else {
+    chat.classList.add("hidden");
+    dash.classList.add("active");
+    btn.textContent = "Chat";
+    document.getElementById("dashContent").innerHTML = `<p>Current grade focus: <strong>${document.getElementById("gradeSelect").value}</strong></p><div id="dashProgress"></div>`;
+    updateProgressUI(); // reuses sidebar logic
+  }
+};
+
+// Init
+updateProgressUI();
+addMessage("assistant", "Welcome to the CAPS Physics Tutor! Select your grade and topic, then ask any question. I will guide you with questions and hints rather than giving direct answers. (Demo mode — add an API key for full AI.)");
+</script>
+</body>
+</html>
